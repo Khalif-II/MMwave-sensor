@@ -1,0 +1,135 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO.Ports;
+using System.Threading;
+using System;
+using TMPro;
+
+
+
+public class SerialInOut : MonoBehaviour
+{
+    public bool isOutport;
+    public static bool isConfig = true;
+    public static bool configError;
+    public string COM = "COM5";
+    public int value;
+    public int SendVal; // ForTesting
+    public float floatVal;
+    public int offset;
+    public string[] lines;
+    public TextAsset config;
+    public string testString = "sensorStop\nflushCfg\ndfeDataOutputMode 1\nchannelCfg 15 3 0\nadcCfg 2 1\nadcbufCfg -1 0 0 1 0\nprofileCfg 0 60.25 7 6 57 0 0 65 1 200 4000 0 0 40\nchirpCfg 0 0 0 0 0 0 0 1\nframeCfg 0 0 2 0 50 1 0\nlowPower 0 1\nguiMonitor 0 0 0 0 1\ncalibDcRangeSig -1 0 0 0 0\nvitalSignsCfg 0.3 0.9 256 512 4 0.1 0.05 100000 300000\nmotionDetection 1 20 2.0 0\nsensorStart\n";
+    [SerializeField]
+    private int linecount  = 0;
+ 
+    SerialPort sp;
+    Thread ReadThread;
+    TMPro.TextMeshProUGUI TmproText;
+    void Start()
+    {
+        TmproText = GetComponent<TMPro.TextMeshProUGUI>();
+        sp = new SerialPort(COM, 115200);
+        sp.ReadTimeout = 10000;
+        sp.WriteTimeout = 10000;
+        sp.WriteTimeout = 10000;
+        sp.Parity = Parity.None;
+        sp.DataBits = 8;
+        sp.StopBits = StopBits.One;
+        sp.RtsEnable = true;
+        sp.Handshake = Handshake.None;
+        sp.Encoding = System.Text.Encoding.UTF8;
+        sp.NewLine = "\n";  // Need this or ReadLine() fails
+        //string text = config.text;
+        // lines =  System.IO.File.ReadAllLines(text);
+        try
+        {
+            sp.Open();
+        }
+        catch (SystemException f)
+        {
+            print("FAILED TO OPEN PORT");
+
+        }
+        if (sp.IsOpen)
+        {
+            print("ConfigOutput Serial Running");
+
+            ReadThread = new Thread(new ThreadStart(ReadSerial));
+            ReadThread.Start();
+            StartCoroutine(WriteConfigLine());
+        }
+    }
+    void ReadSerial()
+    {
+        while (ReadThread.IsAlive)
+        {
+            try
+            {
+                if (sp.BytesToRead > 1)
+                {
+
+
+                    string indata = sp.ReadLine();
+                    Debug.Log(indata);
+                    string[] splits = indata.Split(' ');
+                    
+                  
+
+
+                }
+            }
+            catch (SystemException f)
+            {
+                print(f);
+                ReadThread.Abort();
+            }
+
+        }
+    }
+   
+    IEnumerator WriteConfigLine()
+    {
+        
+        yield return new WaitForSeconds(1);
+      
+        for (int i = 0; i < lines.Length; i++)
+        {
+            try
+            {
+                sp.WriteLine(lines[i]);
+                print(lines[i]);
+                linecount++;
+                print("lineCount is " + linecount); 
+
+            }
+            catch (SystemException f)
+            {
+                print(f.ToString());
+            }
+            yield return new WaitForSeconds(1);
+        }
+        isConfig = false;
+    }
+
+
+    void Update()
+    {
+        if (Input.GetKeyDown(KeyCode.Space))
+        {
+            
+            if (isOutport )
+            {
+               WriteConfigLine();
+            }
+        }
+      
+
+       
+    }
+        void OnApplicationQuit()
+        {
+            ReadThread.Abort();
+        }
+    }
