@@ -1,0 +1,272 @@
+using System.Collections;
+using System.Collections.Generic;
+using UnityEngine;
+using System.IO.Ports;
+using System.Threading;
+using System;
+using TMPro;
+using System.Text;
+
+
+
+public class SerialInRead : MonoBehaviour
+{
+    public static float heartRate;
+    public static float breathingRate;
+    public int simplifiedHRIndex = 150;
+    public int simplifiedBRIndex = 183;
+    public bool isOutport;
+    string data;
+    byte[] dataArray;
+    string dataBuffer;
+    int indexBuffer;
+    string parseData;
+    public string COM = "COM5";
+    public int value;
+    public float parsedVal;
+    public int SendVal; 
+    public float floatVal;
+    public int offset;
+    public string[] lines;
+    static int LENGTH_MAGIC_WORD_BYTES = 8; 
+
+    static int LENGTH_HEADER_BYTES = 40; 
+    static int LENGTH_TLV_MESSAGE_HEADER_BYTES = 8;
+    int LENGTH_DEBUG_DATA_OUT_BYTES = 128;  
+    int MMWDEMO_OUTPUT_MSG_SEGMENT_LEN = 32; 
+                                             
+    static int LENGTH_OFFSET_BYTES = LENGTH_HEADER_BYTES - LENGTH_MAGIC_WORD_BYTES + LENGTH_TLV_MESSAGE_HEADER_BYTES;
+    static int LENGTH_OFFSET_NIBBLES = 2 * LENGTH_OFFSET_BYTES;
+
+    static int INDEX_GLOBAL_COUNT = 6;
+    static int INDEX_RANGE_BIN_PHASE = 1;
+    static int INDEX_RANGE_BIN_VALUE = 2;
+    static int INDEX_PHASE = 5;
+    static int INDEX_BREATHING_WAVEFORM = 6;
+    static int INDEX_HEART_WAVEFORM = 7;
+    static int INDEX_HEART_RATE_EST_FFT = 8;
+    static int INDEX_HEART_RATE_EST_FFT_4Hz = 9;
+    static int INDEX_HEART_RATE_EST_FFT_xCorr = 10;
+    static int INDEX_HEART_RATE_EST_PEAK = 11;
+    static int INDEX_BREATHING_RATE_FFT = 12;
+    static int INDEX_BREATHING_RATE_xCorr = 13;
+    static int INDEX_BREATHING_RATE_PEAK = 14;
+    static int INDEX_CONFIDENCE_METRIC_BREATH = 15;
+    static int INDEX_CONFIDENCE_METRIC_BREATH_xCorr = 16;
+    static int INDEX_CONFIDENCE_METRIC_HEART = 17;
+    static int INDEX_CONFIDENCE_METRIC_HEART_4Hz = 18;
+    static int INDEX_CONFIDENCE_METRIC_HEART_xCorr = 19;
+    static int INDEX_ENERGYWFM_BREATH = 20;
+    static int INDEX_ENERGYWFM_HEART = 21;
+    static int INDEX_MOTION_DETECTION = 22;
+    static int INDEX_BREATHING_RATE_HARM_ENERG = 23;
+    static int INDEX_HEART_RATE_HARM_ENERG = 24;
+
+    static int INDEX_RANGE_PROFILE_START = 35;
+
+    static int INDEX_IN_GLOBAL_FRAME_COUNT = INDEX_GLOBAL_COUNT * 8;
+    static int INDEX_IN_RANGE_BIN_INDEX = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_RANGE_BIN_PHASE * 8 + 4;
+    int INDEX_IN_DATA_CONFIDENCE_METRIC_HEART_4Hz = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_CONFIDENCE_METRIC_HEART_4Hz * 8;
+    int INDEX_IN_DATA_CONFIDENCE_METRIC_HEART_xCorr = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_CONFIDENCE_METRIC_HEART_xCorr * 8;
+    int INDEX_IN_DATA_PHASE = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_PHASE * 8;
+    int INDEX_IN_DATA_BREATHING_WAVEFORM = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_BREATHING_WAVEFORM * 8;
+    int INDEX_IN_DATA_HEART_WAVEFORM = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_HEART_WAVEFORM * 8;
+    int INDEX_IN_DATA_BREATHING_RATE_FFT = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_BREATHING_RATE_FFT * 8;
+    int INDEX_IN_DATA_HEART_RATE_EST_FFT = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_HEART_RATE_EST_FFT * 8;
+    int INDEX_IN_DATA_HEART_RATE_EST_FFT_4Hz = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_HEART_RATE_EST_FFT_4Hz * 8;
+    int INDEX_IN_DATA_HEART_RATE_EST_FFT_xCorr = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_HEART_RATE_EST_FFT_xCorr * 8;
+    int INDEX_IN_DATA_BREATHING_RATE_PEAK = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_BREATHING_RATE_PEAK * 8;
+    int INDEX_IN_DATA_HEART_RATE_EST_PEAK = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_HEART_RATE_EST_PEAK * 8;
+    int INDEX_IN_DATA_CONFIDENCE_METRIC_BREATH = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_CONFIDENCE_METRIC_BREATH * 8;
+    int INDEX_IN_DATA_CONFIDENCE_METRIC_HEART = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_CONFIDENCE_METRIC_HEART * 8;
+    int INDEX_IN_DATA_ENERGYWFM_BREATH = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_ENERGYWFM_BREATH * 8;
+    int INDEX_IN_DATA_ENERGYWFM_HEART = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_ENERGYWFM_HEART * 8;
+    int INDEX_IN_DATA_MOTION_DETECTION_FLAG = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_MOTION_DETECTION * 8;
+    int INDEX_IN_DATA_CONFIDENCE_METRIC_BREATH_xCorr = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_CONFIDENCE_METRIC_BREATH_xCorr * 8;
+    int INDEX_IN_DATA_BREATHING_RATE_HARM_ENERGY = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_BREATHING_RATE_HARM_ENERG * 8;
+    int INDEX_IN_DATA_BREATHING_RATE_xCorr = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_BREATHING_RATE_xCorr * 8;
+
+    int INDEX_IN_DATA_RANGE_PROFILE_START = LENGTH_MAGIC_WORD_BYTES + LENGTH_OFFSET_NIBBLES + INDEX_RANGE_PROFILE_START * 8;
+    float rangeStartMeters;
+    float rangeEndMeters;
+    float samplingRateADC_ksps;
+    int numSamplesChirp;
+    float freqSlope_MHZ_us;
+    float stratFreq_GHz;
+    float chirpDuration_us;
+    float chirpBandwidth_kHz;
+    float rangeMaximum_meters;
+    int rangeFFTsize;
+    float rangeBinSize_meters;
+    int rangeBinStart_index;
+    int rangeBinEnd_index;
+    int numRangeBinProcessed;
+    int totalPayloadSize_bytes;
+    int totalPayloadSize_nibbles;
+    float AGC_thresh;
+
+    public int linecount  = 0;
+    SerialPort sp;
+    Thread ReadThread;
+    TMPro.TextMeshPro TmproText;
+
+    [SerializeField] private TMP_Text textHR;
+    [SerializeField] private TMP_Text textBR;
+
+    void Start()
+    {
+        TmproText = GetComponent<TMPro.TextMeshPro>();
+        sp = new SerialPort(COM, 921600);
+        sp.ReadTimeout = 2000;
+        sp.WriteTimeout = 2000;
+        sp.WriteTimeout = 2000;
+        sp.Parity = Parity.None;
+        sp.DataBits = 8;
+        sp.StopBits = StopBits.One;
+        sp.RtsEnable = true;
+        sp.Handshake = Handshake.None;
+        sp.NewLine = "\n";  
+        
+        
+        try
+        {
+            sp.Open();
+        }
+        catch (SystemException f)
+        {
+            print("FAILED TO OPEN PORT");
+
+        }
+        if (sp.IsOpen)
+        {
+            print("SerialOpen!");
+
+            ReadThread = new Thread(new ThreadStart(ReadSerial));
+            ReadThread.Start();
+
+        }
+    }
+    void ReadSerial()
+    {
+        while (ReadThread.IsAlive)
+        {
+            try
+            {
+                if (sp.BytesToRead > 1)
+                {
+
+
+                    string indata = sp.ReadLine();
+                    byte[] ba = Encoding.Default.GetBytes(indata);
+                    var hexString = BitConverter.ToString(ba);
+                    hexString = hexString.Replace("-", "");
+                    int dataSize = hexString.Length;
+                    dataBuffer +=hexString;
+                    indexBuffer = indexBuffer + dataSize;
+                    
+                    ParseHexVals();
+                
+
+
+                }
+            }
+            catch (SystemException f)
+            {
+                print(f);
+                ReadThread.Abort();
+            }
+
+        }
+    }
+    void ParseHexVals()
+    {
+       
+        string searchStr = "0201040306050807";  
+        int dataStartIndex = dataBuffer.IndexOf(searchStr);
+        
+
+        if (dataStartIndex == -1)
+        {
+            
+            //MagicOk = 0;
+            //qDebug() << " Magic Word Not Found --- local Count:  " << localCount << "DataBufferSize" << dataBuffer.size();
+            //break;
+        }
+        else
+        {
+            
+            int totalPayloadSize_bytes = 40 + 8 + (4 * (33 - 11 + 1));
+            totalPayloadSize_bytes += 8 + 128;
+            int totalPayloadSize_nibbles = 2 * 256;
+
+             
+            try
+            {
+                
+                data = dataBuffer.Substring(dataStartIndex, 512);
+                
+                  
+                dataBuffer = dataBuffer.Remove(dataStartIndex, totalPayloadSize_nibbles );
+                dataBuffer = dataBuffer.Remove(0, dataStartIndex);
+                if (data.Length>= totalPayloadSize_nibbles)
+                {
+                    float br = parseValueFloat(data, simplifiedBRIndex, 8);
+                    float heartRateTemp = parseValueFloat(data, simplifiedHRIndex, 8); 
+                    if (br < 100 && br >= 0)
+                      {
+                        breathingRate = br;
+                      }
+                    if (heartRateTemp >=0 && heartRateTemp < 500)
+                    {
+                        heartRate = heartRateTemp;
+                    }
+                   
+                }
+             
+
+            }
+            catch
+            {
+              
+
+            }
+
+
+
+           
+          
+        }
+       
+    }
+    float parseValueFloat(string data, int valuePos, int valueSize)
+    {
+        parseData = data.Substring(valuePos, valueSize);
+       
+        uint num = uint.Parse(parseData, System.Globalization.NumberStyles.AllowHexSpecifier);
+        
+        byte[] floatVals = BitConverter.GetBytes(num);
+        foreach (byte b in floatVals)
+        {
+           
+        }
+        Array.Reverse(floatVals);
+        float f = BitConverter.ToSingle(floatVals, 0);
+        return f;
+    }
+
+
+    
+
+    void Update()
+    {
+      
+        //update the respective textmesh pro element with the real-time vital signs from the sensor.
+        textHR.text = heartRate.ToString("f0");
+        textBR.text = breathingRate.ToString();
+        
+    }
+        void OnApplicationQuit()
+        {
+            ReadThread.Abort();
+        }
+    }
